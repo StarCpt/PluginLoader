@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 
 namespace avaness.PluginLoader.Compiler
@@ -35,14 +36,20 @@ namespace avaness.PluginLoader.Compiler
         {
             symbols = null;
 
+            CSharpCompilationOptions options = new CSharpCompilationOptions(
+                    OutputKind.DynamicallyLinkedLibrary,
+                    optimizationLevel: debugBuild ? OptimizationLevel.Debug : OptimizationLevel.Release,
+                    allowUnsafe: true)
+                .WithMetadataImportOptions(MetadataImportOptions.All);
+
+            var topLevelBinderFlagsProperty = typeof(CSharpCompilationOptions).GetProperty("TopLevelBinderFlags", BindingFlags.Instance | BindingFlags.NonPublic);
+            topLevelBinderFlagsProperty.SetValue(options, 0x400000u); // 0x400000u is the value for BinderFlags.IgnoresAccessibility
+
             CSharpCompilation compilation = CSharpCompilation.Create(
                 assemblyName,
                 syntaxTrees: source.Select(x => x.Tree),
                 references: RoslynReferences.EnumerateAllReferences().Concat(customReferences),
-                options: new CSharpCompilationOptions(
-                    OutputKind.DynamicallyLinkedLibrary, 
-                    optimizationLevel: debugBuild ? OptimizationLevel.Debug : OptimizationLevel.Release,
-                    allowUnsafe: true));
+                options: options);
 
             using (MemoryStream pdb = new MemoryStream())
             using (MemoryStream ms = new MemoryStream())
